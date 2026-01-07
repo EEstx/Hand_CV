@@ -1,5 +1,6 @@
 opencv-python>=4.8.0
-mediapipe>=0.10.0
+mediapipe==0.10.14
 pygame>=2.5.0
 PyOpenGL>=3.1.6
 numpy>=1.24.0
+numba>=0.58.0  # Опционально, для 10-50x ускорения частиц
