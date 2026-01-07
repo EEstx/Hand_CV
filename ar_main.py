@@ -126,7 +126,52 @@ class HandLandmarksRenderer:
         else:
             self.interpolated_landmarks += (current - self.interpolated_landmarks) * self.interpolation_speed
     
+    def draw_landmarks_for_bloom(self, width, height, color=(0.2, 1.0, 0.5)):
+        """Рендеринг ландмарков для Bloom эффекта (яркие)"""
+        if self.interpolated_landmarks is None: return
+        
+        glMatrixMode(GL_PROJECTION)
+        glPushMatrix()
+        glLoadIdentity()
+        gluOrtho2D(0, 1, 0, 1)
+        glMatrixMode(GL_MODELVIEW)
+        glPushMatrix()
+        glLoadIdentity()
+        
+        glDisable(GL_DEPTH_TEST)
+        glEnable(GL_BLEND)
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+        
+        # Яркие линии для Bloom
+        glLineWidth(4.0)
+        glBegin(GL_LINES)
+        glColor4f(color[0] * 1.5, color[1] * 1.5, color[2] * 1.5, 1.0)
+        for start, end in self.HAND_CONNECTIONS:
+            x1, y1 = self.interpolated_landmarks[start][0], 1 - self.interpolated_landmarks[start][1]
+            x2, y2 = self.interpolated_landmarks[end][0], 1 - self.interpolated_landmarks[end][1]
+            glVertex2f(x1, y1); glVertex2f(x2, y2)
+        glEnd()
+        
+        # Яркие точки для Bloom
+        glPointSize(12.0)
+        glBegin(GL_POINTS)
+        for idx, lm in enumerate(self.interpolated_landmarks):
+            x, y = lm[0], 1 - lm[1]
+            if idx == 0: glColor4f(1.5, 0, 0, 1)
+            elif idx in [4, 8, 12, 16, 20]: glColor4f(0, 0, 1.5, 1)
+            else: glColor4f(color[0] * 1.5, color[1] * 1.5, color[2] * 1.5, 1)
+            glVertex2f(x, y)
+        glEnd()
+        
+        glEnable(GL_DEPTH_TEST)
+        glDisable(GL_BLEND)
+        glPopMatrix()
+        glMatrixMode(GL_PROJECTION)
+        glPopMatrix()
+        glMatrixMode(GL_MODELVIEW)
+    
     def draw_landmarks_opengl(self, width, height, color=(0.2, 1.0, 0.5)):
+        """Рендеринг обычных ландмарков (без Bloom)"""
         if self.interpolated_landmarks is None: return
         
         glMatrixMode(GL_PROJECTION)
@@ -617,6 +662,9 @@ class BloomEffect:
         if not self.enabled or not self.shaders_available:
             return
 
+        # Сохраняем текущий viewport (ИСПРАВЛЕНИЕ БАГА)
+        viewport = glGetIntegerv(GL_VIEWPORT)
+        
         # 1. Рисуем частицы в FBO (Текстура сцены)
         glBindFramebuffer(GL_FRAMEBUFFER, self.fbo)
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, self.scene_tex, 0)
@@ -636,6 +684,7 @@ class BloomEffect:
         
         # 3. Размываем по вертикали и рисуем сразу на ЭКРАН (поверх того что там было)
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
+        glViewport(viewport[0], viewport[1], viewport[2], viewport[3])  # Восстанавливаем viewport
         glEnable(GL_BLEND)
         glBlendFunc(GL_ONE, GL_ONE) # Аддитивный блендинг (свечение)
         glUniform2f(glGetUniformLocation(self.program, "dir"), 0.0, 1.0)
@@ -857,18 +906,21 @@ def main():
             bg.update_texture(frame)
             bg.draw(WIDTH, HEIGHT)
             
-            # 2. Рука (без bloom)
-            hand_renderer.draw_landmarks_opengl(WIDTH, HEIGHT)
-
-            # 3. Bloom частиц (Свечение)
-            def draw_particles_3d():
+            # 2. Bloom эффект для ландмарков руки и частиц
+            def draw_bloom_elements():
+                # Bloom для ландмарков руки
+                hand_renderer.draw_landmarks_for_bloom(WIDTH, HEIGHT)
+                # Bloom для частиц
                 glMatrixMode(GL_PROJECTION); glPushMatrix(); glLoadIdentity(); gluPerspective(45, WIDTH/HEIGHT, 0.1, 50.0)
                 glMatrixMode(GL_MODELVIEW); glPushMatrix(); glLoadIdentity(); glTranslatef(-1.0, 0.2, -3.0)
                 glRotatef(rot_x, 1, 0, 0); glRotatef(rot_y, 0, 1, 0)
                 particles.draw(bloom_enabled=True, shape_color=shapes[current_shape][2])
                 glPopMatrix(); glMatrixMode(GL_PROJECTION); glPopMatrix(); glMatrixMode(GL_MODELVIEW)
 
-            bloom.render_bloom(draw_particles_3d)
+            bloom.render_bloom(draw_bloom_elements)
+
+            # 3. Четкие ландмарки руки (поверх свечения)
+            hand_renderer.draw_landmarks_opengl(WIDTH, HEIGHT)
 
             # 4. Четкие частицы (поверх свечения)
             glMatrixMode(GL_PROJECTION); glPushMatrix(); glLoadIdentity(); gluPerspective(45, WIDTH/HEIGHT, 0.1, 50.0)
