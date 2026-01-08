@@ -19,6 +19,56 @@ except ImportError:
             return func
         return decorator
 
+# ========== ГЛОБАЛЬНЫЕ НАСТРОЙКИ ==========
+
+# --- Частицы ---
+PARTICLE_COUNT = 1000                    # Количество частиц в системе
+PARTICLE_SIZE = 10.0                      # Размер точек частиц
+PARTICLE_SPEED = 0.16                    # Скорость перехода между фигурами (0.0-1.0)
+PARTICLE_BRIGHTNESS_MIN = 0.3            # Минимальная яркость частиц
+PARTICLE_BRIGHTNESS_MAX = 1.3            # Максимальная яркость частиц
+PARTICLE_BRIGHTNESS_BASE = 0.6           # Базовая яркость частиц
+
+# --- Bloom эффект ---
+BLOOM_BLUR_SIZE = 3.0                    # Радиус размытия (больше = сильнее свечение)
+BLOOM_MULTIPLIER = 1.2                   # Множитель яркости для Bloom (больше = ярче)
+
+# --- Рука и жесты ---
+HAND_INTERPOLATION_SPEED = 0.5           # Скорость сглаживания движений руки (0.0-1.0)
+HAND_POINT_SIZE_BLOOM = 12.0             # Размер точек руки для Bloom
+HAND_POINT_SIZE_NORMAL = 10.0            # Размер точек руки обычных
+HAND_LINE_WIDTH_BLOOM = 4.0              # Толщина линий руки для Bloom
+HAND_LINE_WIDTH_NORMAL = 3.0             # Толщина линий руки обычных
+HAND_DETECTION_CONFIDENCE = 0.7          # Уверенность детекции руки (0.0-1.0)
+HAND_TRACKING_CONFIDENCE = 0.7           # Уверенность отслеживания руки (0.0-1.0)
+
+# --- Жесты ---
+PINCH_THRESHOLD = 0.05                   # Порог расстояния для щипка
+GESTURE_TIMEOUT = 1.0                    # Максимальное время между жестами (секунды)
+
+# --- Вращение ---
+ROTATION_AUTO_SPEED = 0.5                # Скорость автовращения (градусы/кадр)
+ROTATION_SMOOTHING = 0.1                 # Сглаживание вращения (0.0-1.0)
+ROTATION_INITIAL_X = 20.0                # Начальный наклон по X
+ROTATION_SENSITIVITY = 300               # Чувствительность управления вращением
+
+# --- Камера ---
+CAMERA_WIDTH = 1280                      # Разрешение камеры по ширине
+CAMERA_HEIGHT = 720                      # Разрешение камеры по высоте
+CAMERA_FOV = 45                          # Поле зрения (градусы)
+CAMERA_NEAR = 0.1                        # Ближняя плоскость отсечения
+CAMERA_FAR = 50.0                        # Дальняя плоскость отсечения
+
+# --- Сцена ---
+SCENE_POSITION_X = -1.0                  # Позиция сцены по X
+SCENE_POSITION_Y = 0.2                   # Позиция сцены по Y
+SCENE_POSITION_Z = -3.0                  # Позиция сцены по Z (глубина)
+
+# --- Производительность ---
+TARGET_FPS = 60                          # Целевой FPS
+
+# ==========================================
+
 # --- ПОТОК КАМЕРЫ ---
 class HandTrackingThread:
     def __init__(self, cap, hands):
@@ -116,7 +166,7 @@ class HandLandmarksRenderer:
     ]
     def __init__(self):
         self.interpolated_landmarks = None
-        self.interpolation_speed = 0.5
+        self.interpolation_speed = HAND_INTERPOLATION_SPEED
     
     def update_interpolation(self, hand_landmarks):
         if hand_landmarks is None: return
@@ -143,7 +193,7 @@ class HandLandmarksRenderer:
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
         
         # Яркие линии для Bloom
-        glLineWidth(4.0)
+        glLineWidth(HAND_LINE_WIDTH_BLOOM)
         glBegin(GL_LINES)
         glColor4f(color[0] * 1.5, color[1] * 1.5, color[2] * 1.5, 1.0)
         for start, end in self.HAND_CONNECTIONS:
@@ -153,7 +203,7 @@ class HandLandmarksRenderer:
         glEnd()
         
         # Яркие точки для Bloom
-        glPointSize(12.0)
+        glPointSize(HAND_POINT_SIZE_BLOOM)
         glBegin(GL_POINTS)
         for idx, lm in enumerate(self.interpolated_landmarks):
             x, y = lm[0], 1 - lm[1]
@@ -186,7 +236,7 @@ class HandLandmarksRenderer:
         glEnable(GL_BLEND)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
         
-        glLineWidth(3.0)
+        glLineWidth(HAND_LINE_WIDTH_NORMAL)
         glBegin(GL_LINES)
         glColor4f(color[0], color[1], color[2], 0.8)
         for start, end in self.HAND_CONNECTIONS:
@@ -195,7 +245,7 @@ class HandLandmarksRenderer:
             glVertex2f(x1, y1); glVertex2f(x2, y2)
         glEnd()
         
-        glPointSize(10.0)
+        glPointSize(HAND_POINT_SIZE_NORMAL)
         glBegin(GL_POINTS)
         for idx, lm in enumerate(self.interpolated_landmarks):
             x, y = lm[0], 1 - lm[1]
@@ -215,14 +265,14 @@ class HandLandmarksRenderer:
 # --- ЧАСТИЦЫ ---
 if NUMBA_AVAILABLE:
     @jit(nopython=True)
-    def update_particles_numba(current_pos, target_pos, speed=0.16):
+    def update_particles_numba(current_pos, target_pos, speed=PARTICLE_SPEED):
         return current_pos + (target_pos - current_pos) * speed
 else:
-    def update_particles_numba(current_pos, target_pos, speed=0.16):
+    def update_particles_numba(current_pos, target_pos, speed=PARTICLE_SPEED):
         return current_pos + (target_pos - current_pos) * speed
 
 class ParticleSystem:
-    def __init__(self, num_particles=5000):
+    def __init__(self, num_particles=PARTICLE_COUNT):
         self.num_particles = num_particles
         self.current_pos = np.random.uniform(-0.6, 0.6, (num_particles, 3)).astype(np.float32)
         self.target_pos = np.copy(self.current_pos)
@@ -518,7 +568,7 @@ class ParticleSystem:
         self.target_pos = np.column_stack((x, y, z))
     
     def update(self):
-        self.current_pos = update_particles_numba(self.current_pos, self.target_pos, 0.16)
+        self.current_pos = update_particles_numba(self.current_pos, self.target_pos, PARTICLE_SPEED)
 
     def draw_frame(self):
         frame_size = 0.65
@@ -534,13 +584,13 @@ class ParticleSystem:
     def draw(self, bloom_enabled=True, shape_color=(0.2, 1.0, 0.5)):
         glEnable(GL_BLEND)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
-        glPointSize(3.0)
+        glPointSize(PARTICLE_SIZE)
         
         z_depths = self.current_pos[:, 2]
-        brightness = 0.6 + (z_depths + 0.6) / 1.2 * 0.7
-        brightness = np.clip(brightness, 0.3, 1.3)
+        brightness = PARTICLE_BRIGHTNESS_BASE + (z_depths + 0.6) / 1.2 * 0.7
+        brightness = np.clip(brightness, PARTICLE_BRIGHTNESS_MIN, PARTICLE_BRIGHTNESS_MAX)
         
-        bloom_multiplier = 1.2 if bloom_enabled else 1.0
+        bloom_multiplier = BLOOM_MULTIPLIER if bloom_enabled else 1.0
         shape_color_array = np.tile(shape_color, (self.num_particles, 1)).astype(np.float32)
         colors = shape_color_array * brightness[:, np.newaxis] * bloom_multiplier
         colors_rgba = np.column_stack((colors, np.full(self.num_particles, 0.98)))
@@ -641,8 +691,8 @@ class BloomEffect:
         
         glUseProgram(self.program)
         glUniform1i(glGetUniformLocation(self.program, "tex"), 0)
-        glUniform1f(glGetUniformLocation(self.program, "blur_size"), 3.0) # Размер размытия
-        glUniform2f(glGetUniformLocation(self.program, "resolution"), float(self.width), float(self.height)) # Передаем разрешение
+        glUniform1f(glGetUniformLocation(self.program, "blur_size"), BLOOM_BLUR_SIZE)
+        glUniform2f(glGetUniformLocation(self.program, "resolution"), float(self.width), float(self.height))
         glUniform2f(glGetUniformLocation(self.program, "dir"), 1.0, 0.0)
         
         self._render_quad(self.scene_tex)
@@ -769,7 +819,7 @@ class GestureRecognizer:
 
     @staticmethod
     def is_pinching(lm):
-        return np.linalg.norm(np.array([lm.landmark[4].x, lm.landmark[4].y]) - np.array([lm.landmark[8].x, lm.landmark[8].y])) < 0.05
+        return np.linalg.norm(np.array([lm.landmark[4].x, lm.landmark[4].y]) - np.array([lm.landmark[8].x, lm.landmark[8].y])) < PINCH_THRESHOLD
 
     @staticmethod
     def get_hand_center(lm):
@@ -781,17 +831,17 @@ def main():
         pygame.init()
         WIDTH, HEIGHT = pygame.display.Info().current_w, pygame.display.Info().current_h
         cap = cv2.VideoCapture(0)
-        cap.set(3, 1280); cap.set(4, 720)
+        cap.set(3, CAMERA_WIDTH); cap.set(4, CAMERA_HEIGHT)
         
         mp_hands = mp.solutions.hands
-        hands = mp_hands.Hands(max_num_hands=1, min_detection_confidence=0.7, min_tracking_confidence=0.7)
+        hands = mp_hands.Hands(max_num_hands=1, min_detection_confidence=HAND_DETECTION_CONFIDENCE, min_tracking_confidence=HAND_TRACKING_CONFIDENCE)
         tracker = HandTrackingThread(cap, hands)
         
         screen = pygame.display.set_mode((WIDTH, HEIGHT), DOUBLEBUF | OPENGL | FULLSCREEN)
         glEnable(GL_DEPTH_TEST)
 
         bg = WebcamBackground()
-        particles = ParticleSystem(5000)
+        particles = ParticleSystem(PARTICLE_COUNT)
         hand_renderer = HandLandmarksRenderer()
         gesture = GestureRecognizer()
         text_r = TextRenderer()
@@ -818,8 +868,8 @@ def main():
         current_shape = 0
         shapes[0][1](); particles.set_color(*shapes[0][2])
         
-        rot_x, rot_y = 20.0, 0.0
-        target_rot_x, target_rot_y = 20.0, 0.0
+        rot_x, rot_y = ROTATION_INITIAL_X, 0.0
+        target_rot_x, target_rot_y = ROTATION_INITIAL_X, 0.0
         is_dragging, prev_x, prev_y = False, 0, 0
         fist_detected, fist_time = False, 0
         
@@ -842,29 +892,29 @@ def main():
                 if gesture.is_fist(landmarks):
                     if not fist_detected: fist_detected, fist_time = True, time.time()
                 elif fist_detected:
-                    if gesture.is_open_palm(landmarks) and (time.time() - fist_time < 1.0):
+                    if gesture.is_open_palm(landmarks) and (time.time() - fist_time < GESTURE_TIMEOUT):
                         current_shape = (current_shape + 1) % len(shapes)
                         shapes[current_shape][1]()
                         particles.set_color(*shapes[current_shape][2])
                         fist_detected = False
-                    elif time.time() - fist_time > 1.0: fist_detected = False
+                    elif time.time() - fist_time > GESTURE_TIMEOUT: fist_detected = False
                 
                 # Вращение
                 if gesture.is_pinching(landmarks):
                     if not is_dragging: is_dragging, prev_x, prev_y = True, cx, cy
                     else:
-                        target_rot_y += (cx - prev_x) * 300
-                        target_rot_x += (cy - prev_y) * 300
+                        target_rot_y += (cx - prev_x) * ROTATION_SENSITIVITY
+                        target_rot_x += (cy - prev_y) * ROTATION_SENSITIVITY
                         prev_x, prev_y = cx, cy
                 else: is_dragging = False
             else: is_dragging = False
 
             if not is_dragging:
-                target_rot_y += 0.5
-                target_rot_x = 20.0
+                target_rot_y += ROTATION_AUTO_SPEED
+                target_rot_x = ROTATION_INITIAL_X
             
-            rot_x += (target_rot_x - rot_x) * 0.1
-            rot_y += (target_rot_y - rot_y) * 0.1
+            rot_x += (target_rot_x - rot_x) * ROTATION_SMOOTHING
+            rot_y += (target_rot_y - rot_y) * ROTATION_SMOOTHING
             particles.update()
 
             # --- ОТРИСОВКА ---
@@ -879,8 +929,8 @@ def main():
                 # Bloom для ландмарков руки
                 hand_renderer.draw_landmarks_for_bloom(WIDTH, HEIGHT)
                 # Bloom для частиц
-                glMatrixMode(GL_PROJECTION); glPushMatrix(); glLoadIdentity(); gluPerspective(45, WIDTH/HEIGHT, 0.1, 50.0)
-                glMatrixMode(GL_MODELVIEW); glPushMatrix(); glLoadIdentity(); glTranslatef(-1.0, 0.2, -3.0)
+                glMatrixMode(GL_PROJECTION); glPushMatrix(); glLoadIdentity(); gluPerspective(CAMERA_FOV, WIDTH/HEIGHT, CAMERA_NEAR, CAMERA_FAR)
+                glMatrixMode(GL_MODELVIEW); glPushMatrix(); glLoadIdentity(); glTranslatef(SCENE_POSITION_X, SCENE_POSITION_Y, SCENE_POSITION_Z)
                 glRotatef(rot_x, 1, 0, 0); glRotatef(rot_y, 0, 1, 0)
                 particles.draw(bloom_enabled=True, shape_color=shapes[current_shape][2])
                 glPopMatrix(); glMatrixMode(GL_PROJECTION); glPopMatrix(); glMatrixMode(GL_MODELVIEW)
@@ -891,15 +941,15 @@ def main():
             hand_renderer.draw_landmarks_opengl(WIDTH, HEIGHT)
 
             # 4. Четкие частицы (поверх свечения)
-            glMatrixMode(GL_PROJECTION); glPushMatrix(); glLoadIdentity(); gluPerspective(45, WIDTH/HEIGHT, 0.1, 50.0)
-            glMatrixMode(GL_MODELVIEW); glPushMatrix(); glLoadIdentity(); glTranslatef(-1.0, 0.2, -3.0)
+            glMatrixMode(GL_PROJECTION); glPushMatrix(); glLoadIdentity(); gluPerspective(CAMERA_FOV, WIDTH/HEIGHT, CAMERA_NEAR, CAMERA_FAR)
+            glMatrixMode(GL_MODELVIEW); glPushMatrix(); glLoadIdentity(); glTranslatef(SCENE_POSITION_X, SCENE_POSITION_Y, SCENE_POSITION_Z)
             glRotatef(rot_x, 1, 0, 0); glRotatef(rot_y, 0, 1, 0)
             particles.draw(bloom_enabled=False, shape_color=shapes[current_shape][2])
             glPopMatrix(); glMatrixMode(GL_PROJECTION); glPopMatrix(); glMatrixMode(GL_MODELVIEW)
 
             # 5. UI (Текст) - РИСУЕМ В САМОМ КОНЦЕ, ЧТОБЫ БЫЛ ЧЕТКИМ
-            glMatrixMode(GL_PROJECTION); glPushMatrix(); glLoadIdentity(); gluPerspective(45, WIDTH/HEIGHT, 0.1, 50.0)
-            glMatrixMode(GL_MODELVIEW); glPushMatrix(); glLoadIdentity(); glTranslatef(-1.0, 0.2, -3.0)
+            glMatrixMode(GL_PROJECTION); glPushMatrix(); glLoadIdentity(); gluPerspective(CAMERA_FOV, WIDTH/HEIGHT, CAMERA_NEAR, CAMERA_FAR)
+            glMatrixMode(GL_MODELVIEW); glPushMatrix(); glLoadIdentity(); glTranslatef(SCENE_POSITION_X, SCENE_POSITION_Y, SCENE_POSITION_Z)
             
             shape_name = shapes[current_shape][0]
             _render_3d_text_fixed(f"> shape :: {shape_name}", -0.5, 0.65, 0, text_r.font_large)
@@ -910,7 +960,7 @@ def main():
             text_r.render_2d(f"FPS: {int(clock.get_fps())}", WIDTH-120, 30, WIDTH, HEIGHT)
             
             pygame.display.flip()
-            clock.tick(60)
+            clock.tick(TARGET_FPS)
 
     except Exception as e:
         import traceback
