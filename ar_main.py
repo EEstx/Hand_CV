@@ -235,38 +235,6 @@ class ParticleSystem:
     # --- ФИГУРЫ ---
     def set_shape_cube(self):
         self.target_pos = np.random.uniform(-0.39, 0.39, (self.num_particles, 3))
-    
-    def set_shape_icosahedron(self):
-        """Икосаэдр (20-гранник, платоново тело)"""
-        # Золотое сечение для вершин икосаэдра
-        phi = (1 + np.sqrt(5)) / 2
-        
-        # 12 вершин икосаэдра
-        vertices = np.array([
-            [-1, phi, 0], [1, phi, 0], [-1, -phi, 0], [1, -phi, 0],
-            [0, -1, phi], [0, 1, phi], [0, -1, -phi], [0, 1, -phi],
-            [phi, 0, -1], [phi, 0, 1], [-phi, 0, -1], [-phi, 0, 1]
-        ]) * 0.25
-        
-        # Генерируем точки на поверхности икосаэдра
-        points = []
-        for _ in range(self.num_particles):
-            # Выбираем случайную вершину как центр грани
-            v_idx = np.random.randint(0, len(vertices))
-            v = vertices[v_idx]
-            
-            # Добавляем небольшое случайное смещение для заполнения граней
-            offset = np.random.uniform(-0.15, 0.15, 3)
-            point = v + offset
-            
-            # Нормализуем для сферической формы
-            norm = np.linalg.norm(point)
-            if norm > 0:
-                point = point / norm * 0.45
-            
-            points.append(point)
-        
-        self.target_pos = np.array(points)
 
     def set_shape_torus(self):
         R, r = 0.39, 0.156
@@ -285,17 +253,6 @@ class ParticleSystem:
         x = radius * np.cos(angle)
         y = height - 0.2925
         z = radius * np.sin(angle)
-        self.target_pos = np.column_stack((x, y, z))
-
-    def set_shape_spiral(self):
-        turns = 4
-        base_t = np.linspace(0, turns*2*np.pi, self.num_particles)
-        theta = np.random.uniform(0, 2*np.pi, self.num_particles)
-        r_tube = np.random.uniform(0, 0.104, self.num_particles)
-        spiral_radius = 0.065 + (base_t / (turns*2*np.pi)) * 0.455
-        x = (spiral_radius + r_tube * np.cos(theta)) * np.cos(base_t)
-        y = np.linspace(-0.52, 0.52, self.num_particles)
-        z = (spiral_radius + r_tube * np.sin(theta)) * np.sin(base_t)
         self.target_pos = np.column_stack((x, y, z))
 
     def set_shape_heart(self):
@@ -395,39 +352,6 @@ class ParticleSystem:
         z = np.concatenate((nz, o1z, o2z, o3z))
         self.target_pos = np.column_stack((x, y, z))[:self.num_particles]
     
-    def set_shape_dodecahedron(self):
-        """Додекаэдр (12-гранник, платоново тело)"""
-        phi = (1 + np.sqrt(5)) / 2
-        
-        # 20 вершин додекаэдра
-        vertices = []
-        # Куб
-        for i in [-1, 1]:
-            for j in [-1, 1]:
-                for k in [-1, 1]:
-                    vertices.append([i, j, k])
-        # Прямоугольники с золотым сечением
-        for i in [-1, 1]:
-            for j in [-1, 1]:
-                vertices.append([0, i/phi, j*phi])
-                vertices.append([i/phi, j*phi, 0])
-                vertices.append([j*phi, 0, i/phi])
-        
-        vertices = np.array(vertices) * 0.22
-        
-        points = []
-        for _ in range(self.num_particles):
-            v_idx = np.random.randint(0, len(vertices))
-            v = vertices[v_idx]
-            offset = np.random.uniform(-0.12, 0.12, 3)
-            point = v + offset
-            norm = np.linalg.norm(point)
-            if norm > 0:
-                point = point / norm * 0.42
-            points.append(point)
-        
-        self.target_pos = np.array(points)
-    
     def set_shape_mobius(self):
         """Лента Мёбиуса"""
         u = np.random.uniform(0, 2*np.pi, self.num_particles)
@@ -437,35 +361,6 @@ class ParticleSystem:
         y = (radius + v * np.cos(u / 2)) * np.sin(u)
         z = v * np.sin(u / 2)
         self.target_pos = np.column_stack((x, y, z))
-    
-    def set_shape_lorenz(self):
-        """Аттрактор Лоренца (хаотическая система)"""
-        # Параметры системы Лоренца
-        sigma, rho, beta = 10.0, 28.0, 8.0/3.0
-        dt = 0.01
-        
-        # Начальные условия
-        x, y, z = 0.1, 0.0, 0.0
-        points = []
-        
-        # Генерируем траекторию
-        for _ in range(self.num_particles):
-            dx = sigma * (y - x) * dt
-            dy = (x * (rho - z) - y) * dt
-            dz = (x * y - beta * z) * dt
-            
-            x += dx
-            y += dy
-            z += dz
-            
-            points.append([x, y, z])
-        
-        points = np.array(points)
-        # Нормализация и центрирование
-        points = (points - np.mean(points, axis=0)) / (np.std(points) * 3.5)
-        points *= 0.5
-        
-        self.target_pos = points
     
     def set_shape_star(self):
         """Пятиконечная звезда 3D"""
@@ -489,26 +384,6 @@ class ParticleSystem:
         x = 0.52 * u / norm
         y = 0.52 * v / norm
         z = 0.52 * w / norm
-        self.target_pos = np.column_stack((x, y, z))
-    
-    def set_shape_trefoil_surface(self):
-        """Поверхность трилистника (Trefoil Surface)"""
-        u = np.random.uniform(0, 2*np.pi, self.num_particles)
-        v = np.random.uniform(0, 2*np.pi, self.num_particles)
-        
-        # Параметрическая поверхность трилистника
-        r = 0.5 + 0.3 * np.cos(1.5 * u)
-        
-        x = r * np.cos(u) * (1 + 0.2 * np.cos(v))
-        y = r * np.sin(u) * (1 + 0.2 * np.cos(v))
-        z = 0.3 * np.sin(1.5 * u) + 0.2 * np.sin(v)
-        
-        # Масштабирование
-        scale = 0.45
-        x *= scale
-        y *= scale
-        z *= scale
-        
         self.target_pos = np.column_stack((x, y, z))
     
     def set_shape_hyperboloid(self):
@@ -569,6 +444,76 @@ class ParticleSystem:
             x = np.concatenate([x, np.random.uniform(-0.52, 0.52, shortage)])
             y = np.concatenate([y, np.random.uniform(-0.2, 0.2, shortage)])
             z = np.concatenate([z, np.random.uniform(-0.52, 0.52, shortage)])
+        
+        self.target_pos = np.column_stack((x, y, z))
+    
+    def set_shape_klein(self):
+        """Бутылка Клейна (сложная топология)"""
+        u = np.random.uniform(0, 2*np.pi, self.num_particles)
+        v = np.random.uniform(0, 2*np.pi, self.num_particles)
+        
+        # Формулы для "восьмерки" бутылки Клейна
+        r = 4 * (1 - np.cos(u) / 2)
+        
+        x = np.where(u <= np.pi,
+            6 * np.cos(u) * (1 + np.sin(u)) + 4 * r * np.cos(u) * np.cos(v),
+            6 * np.cos(u) * (1 + np.sin(u)) - 4 * r * np.cos(v))
+            
+        y = np.where(u <= np.pi,
+            16 * np.sin(u) + 4 * r * np.sin(u) * np.cos(v),
+            16 * np.sin(u))
+            
+        z = r * np.sin(v)
+        
+        # Масштабирование
+        scale = 0.025
+        x = (x - np.mean(x)) * scale
+        y = (y - np.mean(y)) * scale
+        z = z * scale
+        
+        self.target_pos = np.column_stack((x, y, z))
+    
+    def set_shape_sierpinski(self):
+        """Фрактал Серпинского (Игра Хаоса)"""
+        # Вершины основного тетраэдра
+        vertices = np.array([
+            [0, 1, 0],         # Верх
+            [-1, -1, 1],       # Лево низ перед
+            [1, -1, 1],        # Право низ перед
+            [0, -1, -1]        # Тыл низ
+        ]) * 0.45
+        
+        points = []
+        # Стартуем из произвольной точки
+        current_point = np.array([0.0, 0.0, 0.0])
+        
+        for _ in range(self.num_particles):
+            # Выбираем случайную вершину
+            vertex = vertices[np.random.randint(0, 4)]
+            # Двигаемся на половину расстояния к ней
+            current_point = (current_point + vertex) / 2
+            points.append(current_point.copy())
+            
+        self.target_pos = np.array(points)
+    
+    def set_shape_supertorus(self):
+        """Супер-Тор (Квадратный пончик)"""
+        u = np.random.uniform(0, 2*np.pi, self.num_particles)
+        v = np.random.uniform(0, 2*np.pi, self.num_particles)
+        
+        R, r = 0.4, 0.15
+        
+        # Функция sign-power для создания "квадратности"
+        def sgn_pow(val, p):
+            return np.sign(val) * (np.abs(val) ** p)
+        
+        # p=0.2 делает форму очень "квадратной", p=2.0 - круглой
+        p1, p2 = 1.0, 0.2 
+        
+        tmp = R + r * sgn_pow(np.cos(v), p2)
+        x = tmp * sgn_pow(np.cos(u), p1)
+        y = tmp * sgn_pow(np.sin(u), p1)
+        z = r * sgn_pow(np.sin(v), p2)
         
         self.target_pos = np.column_stack((x, y, z))
     
@@ -733,7 +678,7 @@ class BloomEffect:
         glDisable(GL_TEXTURE_2D)
         glEnable(GL_DEPTH_TEST)
         glPopMatrix(); glMatrixMode(GL_PROJECTION); glPopMatrix(); glMatrixMode(GL_MODELVIEW)
-        
+
 # --- ТЕКСТ (ИСПРАВЛЕННЫЙ) ---
 class TextRenderer:
     def __init__(self):
@@ -854,22 +799,20 @@ def main():
 
         shapes = [
             ("Cube", particles.set_shape_cube, (0.2, 1.0, 0.5)),
-            ("Icosahedron", particles.set_shape_icosahedron, (0.2, 0.8, 1.0)),
             ("Torus", particles.set_shape_torus, (1.0, 0.2, 0.2)),
             ("Pyramid", particles.set_shape_pyramid, (1.0, 1.0, 0.2)),
-            ("Spiral", particles.set_shape_spiral, (0.8, 0.2, 1.0)),
             ("Atom", particles.set_shape_atom, (0.4, 0.4, 1.0)),
             ("DNA", particles.set_shape_dna, (0.2, 1.0, 0.8)),
             ("Heart", particles.set_shape_heart, (1.0, 0.2, 0.5)),
-            ("Dodecahedron", particles.set_shape_dodecahedron, (1.0, 0.8, 0.3)),
             ("Mobius", particles.set_shape_mobius, (1.0, 0.6, 0.2)),
-            ("Lorenz", particles.set_shape_lorenz, (0.5, 0.3, 1.0)),
             ("Star", particles.set_shape_star, (1.0, 1.0, 0.3)),
             ("Octahedron", particles.set_shape_octahedron, (0.5, 1.0, 0.5)),
-            ("Trefoil", particles.set_shape_trefoil_surface, (0.3, 1.0, 0.7)),
             ("Hyperboloid", particles.set_shape_hyperboloid, (1.0, 0.5, 0.2)),
             ("Seashell", particles.set_shape_seashell, (0.9, 0.7, 0.5)),
-            ("Wave", particles.set_shape_wave, (0.2, 0.6, 1.0))
+            ("Wave", particles.set_shape_wave, (0.2, 0.6, 1.0)),
+            ("Klein Bottle", particles.set_shape_klein, (0.6, 0.2, 1.0)),
+            ("Sierpinski", particles.set_shape_sierpinski, (1.0, 0.4, 0.0)),
+            ("Super Torus", particles.set_shape_supertorus, (0.0, 1.0, 0.8))
         ]
         
         current_shape = 0
