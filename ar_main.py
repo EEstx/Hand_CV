@@ -222,7 +222,7 @@ else:
         return current_pos + (target_pos - current_pos) * speed
 
 class ParticleSystem:
-    def __init__(self, num_particles=100000):
+    def __init__(self, num_particles=5000):
         self.num_particles = num_particles
         self.current_pos = np.random.uniform(-0.6, 0.6, (num_particles, 3)).astype(np.float32)
         self.target_pos = np.copy(self.current_pos)
@@ -612,25 +612,38 @@ class ParticleSystem:
 # --- BLOOM ---
 class BloomEffect:
     def __init__(self, width, height):
+        self.width = width
+        self.height = height
         self.enabled = True
+        
+        # --- ШЕЙДЕРЫ ---
         vertex_shader = """#version 120
         void main() { gl_TexCoord[0] = gl_MultiTexCoord0; gl_Position = ftransform(); }"""
         
+        # Исправили hardcoded делители 800.0/600.0 на uniform resolution, 
+        # чтобы размытие было одинаковым на всех экранах
         fragment_shader_template = """#version 120
-        uniform sampler2D tex; uniform float blur_size; uniform vec2 dir;
+        uniform sampler2D tex; 
+        uniform float blur_size; 
+        uniform vec2 dir;
+        uniform vec2 resolution; // Добавили разрешение
+        
         void main() {
             vec4 sum = vec4(0.0);
             vec2 tc = gl_TexCoord[0].xy;
-            float blur = blur_size / 800.0;
-            sum += texture2D(tex, tc - 4.0*blur*dir) * 0.05;
-            sum += texture2D(tex, tc - 3.0*blur*dir) * 0.09;
-            sum += texture2D(tex, tc - 2.0*blur*dir) * 0.12;
-            sum += texture2D(tex, tc - 1.0*blur*dir) * 0.15;
+            
+            // Вычисляем размер пикселя для корректного смещения
+            vec2 radius = blur_size / resolution; 
+            
+            sum += texture2D(tex, tc - 4.0*radius*dir) * 0.05;
+            sum += texture2D(tex, tc - 3.0*radius*dir) * 0.09;
+            sum += texture2D(tex, tc - 2.0*radius*dir) * 0.12;
+            sum += texture2D(tex, tc - 1.0*radius*dir) * 0.15;
             sum += texture2D(tex, tc) * 0.16;
-            sum += texture2D(tex, tc + 1.0*blur*dir) * 0.15;
-            sum += texture2D(tex, tc + 2.0*blur*dir) * 0.12;
-            sum += texture2D(tex, tc + 3.0*blur*dir) * 0.09;
-            sum += texture2D(tex, tc + 4.0*blur*dir) * 0.05;
+            sum += texture2D(tex, tc + 1.0*radius*dir) * 0.15;
+            sum += texture2D(tex, tc + 2.0*radius*dir) * 0.12;
+            sum += texture2D(tex, tc + 3.0*radius*dir) * 0.09;
+            sum += texture2D(tex, tc + 4.0*radius*dir) * 0.05;
             gl_FragColor = sum;
         }"""
         
@@ -662,33 +675,45 @@ class BloomEffect:
         if not self.enabled or not self.shaders_available:
             return
 
-        # Сохраняем текущий viewport (ИСПРАВЛЕНИЕ БАГА)
-        viewport = glGetIntegerv(GL_VIEWPORT)
+        # 1. Сохраняем текущий Viewport экрана
+        viewport_orig = glGetIntegerv(GL_VIEWPORT)
         
-        # 1. Рисуем частицы в FBO (Текстура сцены)
+        # 2. Рисуем сцену в FBO
         glBindFramebuffer(GL_FRAMEBUFFER, self.fbo)
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, self.scene_tex, 0)
-        glClearColor(0, 0, 0, 0) # ЧИСТЫЙ ЧЕРНЫЙ ФОН
+        
+        # !!! ВАЖНО: Принудительно ставим Viewport под размер текстуры !!!
+        glViewport(0, 0, self.width, self.height)
+        
+        glClearColor(0, 0, 0, 0)
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
         
-        draw_scene_func() # Рисуем только частицы
+        draw_scene_func() 
         
-        # 2. Размываем по горизонтали
+        # 3. Размываем по горизонтали
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, self.blur_tex, 0)
         glClear(GL_COLOR_BUFFER_BIT)
+        
         glUseProgram(self.program)
         glUniform1i(glGetUniformLocation(self.program, "tex"), 0)
-        glUniform1f(glGetUniformLocation(self.program, "blur_size"), 4.0)
+        glUniform1f(glGetUniformLocation(self.program, "blur_size"), 3.0) # Размер размытия
+        glUniform2f(glGetUniformLocation(self.program, "resolution"), float(self.width), float(self.height)) # Передаем разрешение
         glUniform2f(glGetUniformLocation(self.program, "dir"), 1.0, 0.0)
+        
         self._render_quad(self.scene_tex)
         
-        # 3. Размываем по вертикали и рисуем сразу на ЭКРАН (поверх того что там было)
+        # 4. Размываем по вертикали и рисуем на ЭКРАН
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
-        glViewport(viewport[0], viewport[1], viewport[2], viewport[3])  # Восстанавливаем viewport
+        
+        # !!! ВАЖНО: Восстанавливаем Viewport экрана !!!
+        glViewport(viewport_orig[0], viewport_orig[1], viewport_orig[2], viewport_orig[3])
+        
         glEnable(GL_BLEND)
-        glBlendFunc(GL_ONE, GL_ONE) # Аддитивный блендинг (свечение)
+        glBlendFunc(GL_ONE, GL_ONE) 
+        
         glUniform2f(glGetUniformLocation(self.program, "dir"), 0.0, 1.0)
         self._render_quad(self.blur_tex)
+        
         glUseProgram(0)
         glDisable(GL_BLEND)
 
@@ -708,7 +733,7 @@ class BloomEffect:
         glDisable(GL_TEXTURE_2D)
         glEnable(GL_DEPTH_TEST)
         glPopMatrix(); glMatrixMode(GL_PROJECTION); glPopMatrix(); glMatrixMode(GL_MODELVIEW)
-
+        
 # --- ТЕКСТ (ИСПРАВЛЕННЫЙ) ---
 class TextRenderer:
     def __init__(self):
@@ -821,7 +846,7 @@ def main():
         glEnable(GL_DEPTH_TEST)
 
         bg = WebcamBackground()
-        particles = ParticleSystem(100000)
+        particles = ParticleSystem(5000)
         hand_renderer = HandLandmarksRenderer()
         gesture = GestureRecognizer()
         text_r = TextRenderer()
