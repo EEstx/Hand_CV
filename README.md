@@ -1,7 +1,7 @@
 # AR Hand Gesture Control
 
 Real-time 3D particle system controlled by hand gestures using computer vision and OpenGL rendering.
-
+![demo](demo/ezgif-48af99cb3d89b718.gif)
 ## Overview
 
 This application uses MediaPipe for hand tracking and OpenGL for rendering interactive 3D particle-based shapes. All rendering is GPU-accelerated with bloom post-processing effects.
